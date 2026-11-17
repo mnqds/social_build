@@ -1,0 +1,32 @@
+name: iOS IPA (private source)
+on:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: macos-13
+    timeout-minutes: 60
+    steps:
+      - name: Checkout private source
+        run: |
+          git clone --depth 1 "https://x-access-token:${{ secrets.SRC_TOKEN }}@github.com/mnqds/social_simulator.git" src
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Pub get
+        run: cd src && flutter pub get
+      - name: Build iOS (no codesign)
+        run: |
+          cd src && flutter build ios --release --no-codesign --obfuscate \
+            --split-debug-info=build/symbols --dart-define=IOS_PREVIEW=false
+      - name: Package IPA
+        run: |
+          cd src/build/ios/iphoneos
+          mkdir -p Payload && cp -R Runner.app Payload/
+          zip -qr social_simulator_unsigned.ipa Payload
+          ls -lh social_simulator_unsigned.ipa
+      - uses: actions/upload-artifact@v4
+        with:
+          name: social_simulator_unsigned
+          path: src/build/ios/iphoneos/social_simulator_unsigned.ipa
+          if-no-files-found: error
